@@ -64,7 +64,7 @@
         return;
     }
     // Things are cleaned up in browserExit.
-    [self.inAppBrowserViewController close];
+	[self.inAppBrowserViewController close:self];
 }
 
 - (BOOL) isSystemUrl:(NSURL*)url
@@ -449,11 +449,11 @@
     }
 }
 
-- (void)browserExit
+- (void)browserExit:(NSString*)event
 {
     if (self.callbackId != nil) {
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                      messageAsDictionary:@{@"type":@"exit"}];
+                                                      messageAsDictionary:@{@"type":event}];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
         self.callbackId = nil;
     }
@@ -504,9 +504,166 @@
    self.webView.delegate = nil;
 }
 
+-(UIColor*)colorFromHex:(NSString*)hexStr
+{
+	if ([hexStr length] == 7)
+	{
+		unsigned int hex = 0xFFFFFF;
+		NSScanner* scanner = [NSScanner scannerWithString:[NSString stringWithFormat:@"0x%@",[hexStr substringFromIndex:1]]];
+		[scanner scanHexInt:&hex];
+		
+		return [UIColor colorWithRed:((float)((hex & 0xFF0000) >> 16))/255.0 green:((float)((hex & 0x00FF00) >>  8))/255.0 blue:((float)((hex & 0x0000FF) >>  0))/255.0 alpha:1.0];
+	}
+	else
+	{
+		return [UIColor whiteColor];
+	}
+}
+
+- (void)createViews2
+{
+	
+	
+	self.eventMap = [[NSMutableDictionary alloc] init];
+	
+	bool showTopToolbar = ![_browserOptions.toptoolbaroptions isEqualToString:@""];
+	bool showBottomToolbar = ![_browserOptions.bottomtoolbaroptions isEqualToString:@""];
+	
+	// create webview:
+	CGRect webViewBounds = self.view.bounds;
+	webViewBounds.size.height -= (showTopToolbar ? TOOLBAR_HEIGHT : 0) + (showBottomToolbar ? TOOLBAR_HEIGHT : 0);
+	webViewBounds.origin.y += (showTopToolbar ? TOOLBAR_HEIGHT : 0);
+	self.webView = [[UIWebView alloc] initWithFrame:webViewBounds];
+	
+	self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
+	
+	[self.view addSubview:self.webView];
+	[self.view sendSubviewToBack:self.webView];
+	
+	self.webView.delegate = _webViewDelegate;
+	self.webView.backgroundColor = [UIColor whiteColor];
+	
+	self.webView.clearsContextBeforeDrawing = YES;
+	self.webView.clipsToBounds = YES;
+	self.webView.contentMode = UIViewContentModeScaleToFill;
+	self.webView.multipleTouchEnabled = YES;
+	self.webView.opaque = YES;
+	self.webView.scalesPageToFit = NO;
+	self.webView.userInteractionEnabled = YES;
+	
+	self.spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:UIActivityIndicatorViewStyleGray];
+	self.spinner.alpha = 1.000;
+	self.spinner.autoresizesSubviews = YES;
+	self.spinner.autoresizingMask = (UIViewAutoresizingFlexibleLeftMargin | UIViewAutoresizingFlexibleTopMargin | UIViewAutoresizingFlexibleBottomMargin | UIViewAutoresizingFlexibleRightMargin);
+	self.spinner.clearsContextBeforeDrawing = NO;
+	self.spinner.clipsToBounds = NO;
+	self.spinner.contentMode = UIViewContentModeScaleToFill;
+	self.spinner.frame = CGRectMake(CGRectGetMidX(self.webView.frame), CGRectGetMidY(self.webView.frame), 20.0, 20.0);
+	self.spinner.hidden = NO;
+	self.spinner.hidesWhenStopped = YES;
+	self.spinner.multipleTouchEnabled = NO;
+	self.spinner.opaque = NO;
+	self.spinner.userInteractionEnabled = NO;
+	[self.spinner stopAnimating];
+	
+	if (showTopToolbar)
+	{
+		self.toolbar = [self parseToolbarFromString:_browserOptions.toptoolbaroptions frame:CGRectMake(0.0, [UIApplication sharedApplication].statusBarFrame.size.height, self.view.bounds.size.width, TOOLBAR_HEIGHT) isAtBottom:false];
+		[self.view addSubview:self.toolbar];
+	}
+	if (showBottomToolbar)
+	{
+		self.toolbar2 = [self parseToolbarFromString:_browserOptions.bottomtoolbaroptions frame:CGRectMake(0.0, self.view.bounds.size.height-TOOLBAR_HEIGHT, self.view.bounds.size.width, TOOLBAR_HEIGHT) isAtBottom:true];
+		[self.view addSubview:self.toolbar2];
+	}
+	
+	
+	[self.toolbar setBarTintColor: [self colorFromHex:_browserOptions.backgroundcolor]];
+	[self.toolbar setTintColor: [self colorFromHex:_browserOptions.textcolor]];
+	[self.toolbar2 setBarTintColor: [self colorFromHex:_browserOptions.backgroundcolor]];
+	[self.toolbar2 setTintColor: [self colorFromHex:_browserOptions.textcolor]];
+	//self.view.backgroundColor = [UIColor grayColor];
+}
+
+-(UIToolbar*)parseToolbarFromString:(NSString*)string frame:(CGRect)frame isAtBottom:(bool)isAtBottom
+{
+	UIToolbar* toolbar = [[UIToolbar alloc] initWithFrame:frame];
+	toolbar.alpha = 1.000;
+	toolbar.autoresizesSubviews = YES;
+	toolbar.autoresizingMask = isAtBottom ? (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin) : UIViewAutoresizingFlexibleWidth;
+	toolbar.barStyle = UIBarStyleBlackOpaque;
+	toolbar.clearsContextBeforeDrawing = NO;
+	toolbar.clipsToBounds = NO;
+	toolbar.contentMode = UIViewContentModeScaleToFill;
+	toolbar.hidden = NO;
+	toolbar.multipleTouchEnabled = NO;
+	toolbar.opaque = NO;
+	toolbar.userInteractionEnabled = YES;
+	
+	
+	NSMutableArray* toolbarItems = [[NSMutableArray alloc] init];
+	NSArray* pairs = [string componentsSeparatedByString:@";"];
+	for (NSString* pair in pairs) {
+		NSArray* values = [pair componentsSeparatedByString:@"-"];
+		
+		if ([values count]==1 && [values[0] isEqualToString:@"back"])
+		{
+			// create back button
+			NSString* backArrowString = NSLocalizedString(@"◄", nil); // create arrow from Unicode char
+			self.backButton = [[UIBarButtonItem alloc] initWithTitle:backArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goBack:)];
+			self.backButton.enabled = YES;
+			self.backButton.imageInsets = UIEdgeInsetsZero;
+			self.backButton.tintColor = [self colorFromHex:_browserOptions.textcolor];
+			[toolbarItems addObject:self.backButton];
+		}
+		else if ([values count]==1 && [values[0] isEqualToString:@"forward"])
+		{
+			// create forward button
+			NSString* frontArrowString = NSLocalizedString(@"►", nil); // create arrow from Unicode char
+			self.forwardButton = [[UIBarButtonItem alloc] initWithTitle:frontArrowString style:UIBarButtonItemStylePlain target:self action:@selector(goForward:)];
+			self.forwardButton.enabled = YES;
+			self.forwardButton.imageInsets = UIEdgeInsetsZero;
+			[toolbarItems addObject:self.forwardButton];
+		}
+		else if ([values count]==1 && [values[0] isEqualToString:@"space"])
+		{
+			// create flexible space
+			UIBarButtonItem* flexibleSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
+			[toolbarItems addObject:flexibleSpaceButton];
+		}
+		else if ([values count]==2 && [values[0] isEqualToString:@"title"])
+		{
+			// create flexible space
+			UIBarButtonItem* title = [[UIBarButtonItem alloc] initWithTitle:values[1] style:UIBarButtonItemStyleDone target:nil action:nil];
+			title.enabled = YES;
+			[toolbarItems addObject:title];
+		}
+		else if ([values count]==3 && [values[0] isEqualToString:@"closebutton"])
+		{
+			// create close button
+			UIBarButtonItem* closeButton = [[UIBarButtonItem alloc] initWithTitle:values[1] style:UIBarButtonItemStylePlain target:self action:@selector(close:)];
+			UIBarButtonItem* xcloseButton = [[UIBarButtonItem alloc] initWithTitle:values[1] style:UIBarButtonItemStylePlain target:self action:@selector(close:)];
+			closeButton.enabled = YES;
+			[toolbarItems addObject:closeButton];
+			self.eventMap[closeButton.title] = values[2];
+		}
+	}
+	
+	[toolbar setItems:toolbarItems];
+	
+	return toolbar;
+}
+
 - (void)createViews
 {
     // We create the views in code for primarily for ease of upgrades and not requiring an external .xib to be included
+	
+	if (![_browserOptions.toptoolbaroptions isEqualToString:@""] || ![_browserOptions.bottomtoolbaroptions isEqualToString:@""])
+	{
+		// If our extra options are used then use a different method of creating the views:
+		[self createViews2];
+		return;
+	}
 
     CGRect webViewBounds = self.view.bounds;
     BOOL toolbarIsAtBottom = ![_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop];
@@ -544,7 +701,7 @@
     self.spinner.userInteractionEnabled = NO;
     [self.spinner stopAnimating];
 
-    self.closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(close)];
+	self.closeButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone target:self action:@selector(close:)];
     self.closeButton.enabled = YES;
 
     UIBarButtonItem* flexibleSpaceButton = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemFlexibleSpace target:nil action:nil];
@@ -628,7 +785,7 @@
     // the advantage of using UIBarButtonSystemItemDone is the system will localize it for you automatically
     // but, if you want to set this yourself, knock yourself out (we can't set the title for a system Done button, so we have to create a new one)
     self.closeButton = nil;
-    self.closeButton = [[UIBarButtonItem alloc] initWithTitle:title style:UIBarButtonItemStyleBordered target:self action:@selector(close)];
+	self.closeButton = [[UIBarButtonItem alloc] initWithTitle:title style:UIBarButtonItemStyleBordered target:self action:@selector(close:)];
     self.closeButton.enabled = YES;
     self.closeButton.tintColor = [UIColor colorWithRed:60.0 / 255.0 green:136.0 / 255.0 blue:230.0 / 255.0 alpha:1];
 
@@ -690,6 +847,11 @@
 
 - (void)showToolBar:(BOOL)show : (NSString *) toolbarPosition
 {
+	if (![_browserOptions.toptoolbaroptions isEqualToString:@""] || ![_browserOptions.bottomtoolbaroptions isEqualToString:@""])
+	{
+		return;
+	}
+	
     CGRect toolbarFrame = self.toolbar.frame;
     CGRect locationbarFrame = self.addressLabel.frame;
 
@@ -770,13 +932,31 @@
     return NO;
 }
 
-- (void)close
+- (void)close:(id)sender
 {
+	NSString* event = @"exit";
+	if (sender!=nil) {
+		if([sender isKindOfClass:[UIBarButtonItem class]])
+		{
+			UIBarButtonItem* button = sender;
+			NSLog(@"SENDER is UIBarButtonItem %@", button.title);
+			NSLog(@"EventMap: %@", self.eventMap);
+			if ([self.eventMap objectForKey:button.title] != nil)
+			{
+				event = self.eventMap[button.title];
+			}
+		} else {
+			NSLog(@"SENDER is other");
+		}
+	} else {
+		NSLog(@"SENDER is nil");
+	}
+	
     [CDVUserAgentUtil releaseLock:&_userAgentLockToken];
     self.currentURL = nil;
 
-    if ((self.navigationDelegate != nil) && [self.navigationDelegate respondsToSelector:@selector(browserExit)]) {
-        [self.navigationDelegate browserExit];
+	if ((self.navigationDelegate != nil) && [self.navigationDelegate respondsToSelector:@selector(browserExit:)]) {
+		[self.navigationDelegate browserExit:event];
     }
 
     __weak UIViewController* weakSelf = self;
@@ -963,6 +1143,11 @@
         self.suppressesincrementalrendering = NO;
         self.hidden = NO;
         self.disallowoverscroll = NO;
+		
+		self.toptoolbaroptions = @"";
+		self.bottomtoolbaroptions = @"";
+		self.textcolor = @"#FFFFFF";
+		self.backgroundcolor = @"#000000";
     }
 
     return self;

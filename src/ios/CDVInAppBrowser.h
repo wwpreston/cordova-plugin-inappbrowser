@@ -63,6 +63,11 @@
 @property (nonatomic, assign) BOOL hidden;
 @property (nonatomic, assign) BOOL disallowoverscroll;
 
+@property (nonatomic, copy) NSString* toptoolbaroptions;
+@property (nonatomic, copy) NSString* bottomtoolbaroptions;
+@property (nonatomic, copy) NSString* textcolor;
+@property (nonatomic, copy) NSString* backgroundcolor;
+
 + (CDVInAppBrowserOptions*)parseOptions:(NSString*)options;
 
 @end
@@ -82,6 +87,8 @@
     
 }
 
+@property (nonatomic, strong) NSMutableDictionary* eventMap;
+
 @property (nonatomic, strong) IBOutlet UIWebView* webView;
 @property (nonatomic, strong) IBOutlet UIBarButtonItem* closeButton;
 @property (nonatomic, strong) IBOutlet UILabel* addressLabel;
@@ -90,11 +97,13 @@
 @property (nonatomic, strong) IBOutlet UIActivityIndicatorView* spinner;
 @property (nonatomic, strong) IBOutlet UIToolbar* toolbar;
 
+@property (nonatomic, strong) IBOutlet UIToolbar* toolbar2;
+
 @property (nonatomic, weak) id <CDVScreenOrientationDelegate> orientationDelegate;
 @property (nonatomic, weak) CDVInAppBrowser* navigationDelegate;
 @property (nonatomic) NSURL* currentURL;
 
-- (void)close;
+- (void)close:(id)sender;
 - (void)navigateTo:(NSURL*)url;
 - (void)showLocationBar:(BOOL)show;
 - (void)showToolBar:(BOOL)show : (NSString *) toolbarPosition;
