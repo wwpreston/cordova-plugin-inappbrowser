@@ -22,6 +22,7 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.provider.Browser;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
@@ -865,6 +866,7 @@ public class InAppBrowser extends CordovaPlugin {
                     back.setId(Integer.valueOf(2));
                     int backResId = activityRes.getIdentifier("ic_action_previous_item", "drawable", cordova.getActivity().getPackageName());
                     Drawable backIcon = activityRes.getDrawable(backResId);
+                    backIcon.setColorFilter(textColorInt, PorterDuff.Mode.MULTIPLY);
                     if (Build.VERSION.SDK_INT >= 16)
                         back.setBackground(null);
                     else
@@ -890,6 +892,7 @@ public class InAppBrowser extends CordovaPlugin {
                     forward.setId(Integer.valueOf(3));
                     int fwdResId = activityRes.getIdentifier("ic_action_next_item", "drawable", cordova.getActivity().getPackageName());
                     Drawable fwdIcon = activityRes.getDrawable(fwdResId);
+                    fwdIcon.setColorFilter(textColorInt, PorterDuff.Mode.MULTIPLY);
                     if (Build.VERSION.SDK_INT >= 16)
                         forward.setBackground(null);
                     else
