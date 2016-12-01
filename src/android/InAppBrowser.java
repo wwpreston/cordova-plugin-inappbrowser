@@ -422,6 +422,7 @@ public class InAppBrowser extends CordovaPlugin {
             @Override
             public void run() {
                 final WebView childView = inAppWebView;
+                final String url = inAppWebView!=null ? inAppWebView.getUrl() : "";
                 // The JS protects against multiple calls, so this should happen only when
                 // closeDialog() is called by other native code.
                 if (childView == null) {
@@ -445,6 +446,7 @@ public class InAppBrowser extends CordovaPlugin {
                 try {
                     JSONObject obj = new JSONObject();
                     obj.put("type", event==null ? EXIT_EVENT : event);
+                    obj.put("url", url==null ? "" : url);
                     sendUpdate(obj, false);
                 } catch (JSONException ex) {
                     LOG.d(LOG_TAG, "Should never happen");
