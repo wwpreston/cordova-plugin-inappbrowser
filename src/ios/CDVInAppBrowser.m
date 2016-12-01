@@ -451,9 +451,12 @@
 
 - (void)browserExit:(NSString*)event
 {
+	
+    NSString *url = [self.inAppBrowserViewController.webView stringByEvaluatingJavaScriptFromString:@"window.location.toString()"];
+    if (url==nil) url = @"";
     if (self.callbackId != nil) {
         CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
-                                                      messageAsDictionary:@{@"type":event}];
+                                                      messageAsDictionary:@{@"type":event, @"url":url}];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:self.callbackId];
         self.callbackId = nil;
     }
