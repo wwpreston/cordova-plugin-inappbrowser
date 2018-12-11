@@ -46,6 +46,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.webkit.CookieManager;
 import android.webkit.CookieSyncManager;
 import android.webkit.HttpAuthHandler;
+import android.webkit.ValueCallback;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -417,10 +418,49 @@ public class InAppBrowser extends CordovaPlugin {
     public void closeDialog() {
         closeDialog(null);
     }
-    public void closeDialog(final String event) {
-        this.cordova.getActivity().runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
+    public void closeDialog(final String event)
+	{
+		this.cordova.getActivity().runOnUiThread(new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				// send a loadend event with the final url
+				inAppWebView.evaluateJavascript("window.location.toString()", new ValueCallback<String>()
+				{
+					@Override
+					public void onReceiveValue(String s)
+					{
+						try
+						{
+							String newloc = s;
+							if (s.charAt(0) == '"' && s.charAt(s.length()-1) == '"') {
+								newloc = s.substring(1, s.length()-2);
+							}
+							JSONObject obj = new JSONObject();
+							obj.put("type", "loadend");
+							obj.put("url", newloc);
+							sendUpdate(obj, true);
+						}
+						catch (Exception e)
+						{
+						}
+						finally
+						{
+							closeDialog2(event);
+						}
+					}
+				});
+			}
+		});
+	}
+
+
+	public void closeDialog2(final String event) {
+		this.cordova.getActivity().runOnUiThread(new Runnable() {
+			@Override
+			public void run() {
+
                 final WebView childView = inAppWebView;
                 final String url = inAppWebView!=null ? inAppWebView.getUrl() : "";
                 // The JS protects against multiple calls, so this should happen only when
