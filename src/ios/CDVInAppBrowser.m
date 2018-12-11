@@ -34,6 +34,39 @@
 
 #pragma mark CDVInAppBrowser
 
+
+/* Function to get device name */
+#import <sys/utsname.h>
+NSString* deviceName()
+{
+	struct utsname systemInfo;
+	uname(&systemInfo);
+	
+	return [NSString stringWithCString:systemInfo.machine
+							  encoding:NSUTF8StringEncoding];
+}
+bool isIPhoneX()
+{
+	NSString* dName = deviceName();
+	NSArray<NSString*>* iPhoneXNames = @[
+										 @"iPhone10,3", // iPhone X (CDMA)
+										 @"iPhone10,6", // iPhone X (GSM)
+										 @"iPhone11,2", // iPhone XS
+										 @"iPhone11,4", // iPhone XS Max
+										 @"iPhone11,6", // iPhone XS Max China
+										 @"iPhone11,8" // iPhone XR
+										 ];
+	for (int i=0; i<[iPhoneXNames count]; ++i)
+	{
+		if ([iPhoneXNames[i] isEqualToString:dName])
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+
 @interface CDVInAppBrowser () {
     NSInteger _previousStatusBarStyle;
 }
@@ -525,7 +558,8 @@
 
 - (void)createViews2
 {
-	
+	bool isX = isIPhoneX();
+	CGFloat xBottomMargin = 20;
 	
 	self.eventMap = [[NSMutableDictionary alloc] init];
 	
@@ -534,8 +568,9 @@
 	
 	// create webview:
 	CGRect webViewBounds = self.view.bounds;
-	webViewBounds.size.height -= (showTopToolbar ? TOOLBAR_HEIGHT : 0) + (showBottomToolbar ? TOOLBAR_HEIGHT : 0);
-	webViewBounds.origin.y += (showTopToolbar ? TOOLBAR_HEIGHT : 0);
+	CGFloat statusBarHeight = [UIApplication sharedApplication].statusBarFrame.size.height;
+	webViewBounds.size.height -= statusBarHeight + (showTopToolbar ? TOOLBAR_HEIGHT : 0) + (showBottomToolbar ? TOOLBAR_HEIGHT : 0) + (isX ? xBottomMargin : 0);
+	webViewBounds.origin.y += statusBarHeight + (showTopToolbar ? TOOLBAR_HEIGHT : 0);
 	self.webView = [[UIWebView alloc] initWithFrame:webViewBounds];
 	
 	self.webView.autoresizingMask = (UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight);
@@ -576,7 +611,7 @@
 	}
 	if (showBottomToolbar)
 	{
-		self.toolbar2 = [self parseToolbarFromString:_browserOptions.bottomtoolbaroptions frame:CGRectMake(0.0, self.view.bounds.size.height-TOOLBAR_HEIGHT, self.view.bounds.size.width, TOOLBAR_HEIGHT) isAtBottom:true];
+		self.toolbar2 = [self parseToolbarFromString:_browserOptions.bottomtoolbaroptions frame:CGRectMake(0.0, self.view.bounds.size.height-TOOLBAR_HEIGHT-(isX?xBottomMargin:0), self.view.bounds.size.width, TOOLBAR_HEIGHT) isAtBottom:true];
 		[self.view addSubview:self.toolbar2];
 	}
 	
@@ -937,6 +972,17 @@
 
 - (void)close:(id)sender
 {
+	// trigger loadend event with final url
+	if (self.navigationDelegate.callbackId != nil) {
+		NSString* url = [self.webView stringByEvaluatingJavaScriptFromString:@"window.location.toString()"];
+		CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK
+													  messageAsDictionary:@{@"type":@"loadend", @"url":url}];
+		[pluginResult setKeepCallback:[NSNumber numberWithBool:YES]];
+		
+		[self.navigationDelegate.commandDelegate sendPluginResult:pluginResult callbackId:self.navigationDelegate.callbackId];
+	}
+	
+	
 	NSString* event = @"exit";
 	if (sender!=nil) {
 		if([sender isKindOfClass:[UIBarButtonItem class]])
